@@ -37,9 +37,8 @@ class I2AGenerator(Generator):
         if state is not None:
             seed(state)
         
-        # TODO: fix bug where >4 boxes generated, and box on top of goal
         for _ in range(self.max_room_tries):
-            board = Board.from_array(np.full((height, width), WALL))
+            board_room = Board.from_array(np.full((height, width), WALL))
 
             # random walk from random start position + direction
             bounds = (1, height - 2, 1, width - 2)
@@ -52,7 +51,7 @@ class I2AGenerator(Generator):
                 pattern = choice(self.patterns)
                 for d in pattern:
                     if (position + d).in_bounds(*bounds):
-                        board[position] = SPACE
+                        board_room[position] = SPACE
 
                 # move one step in direction, if won't reach edge of board
                 if (position + direction).in_bounds(*bounds):
@@ -64,6 +63,7 @@ class I2AGenerator(Generator):
 
             # randomly choose initial player position and goal positions
             for _ in range(self.max_position_tries):
+                board = board_room.copy()
                 spaces = list(board.spaces)
                 if len(spaces) < 1 + boxes:
                     break
@@ -74,7 +74,6 @@ class I2AGenerator(Generator):
                     board[goal] = BOX
 
                 # use dfs to play puzzle in reverse
-                # TODO: optimize (cur: 15s for 10 ^ 6 pos, no clear bottlenecks)
                 moves = [(d, b) for d in directions.values()
                          for b in (True, False)]
                 frontier = [(board, player, 0)]
@@ -128,10 +127,8 @@ class I2AGenerator(Generator):
                             
                 def score(board, player, _, box_positions, box_swaps):
                     # score is 0 whenever box or player is on top of goal
-                    if any([player == goal for goal in goals]):
-                        return 0
-                    elif any([box == goal for box, goal in
-                              zip(box_positions, goal_positions)]):
+                    if any([player == goal or board[goal] == BOX
+                            for goal in goals]):
                         return 0
 
                     box_displacements = [manhattan_dist(box, goal)
@@ -140,8 +137,8 @@ class I2AGenerator(Generator):
                     return box_swaps * sum(box_displacements)
 
                 # calculate scores, find room that maximizes score
-                board, player = \
-                    max(statistics, key = lambda k: score(*k, *statistics[k]))
+                board, player = max(statistics,
+                                    key = lambda k: score(*k, *statistics[k]))
                 best_score = score(board, player, *statistics[(board, player)])
 
                 if best_score <= 0:

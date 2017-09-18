@@ -11,11 +11,24 @@ from constants import *
 from sokoban import *
 from util import *
 
+# functions
+
+def trace_history(prev, sokoban):
+    """retrace steps from goal state to start state"""
+    history = [sokoban]
+    while prev[sokoban] is not None:
+        sokoban, action = prev[sokoban]
+        history = [sokoban, action] + history
+    return history
+
 # classes
 
 class Solver(ABC):
     @abstractmethod
     def solve(self, sokoban):
+        """input: sokoban puzzle
+           output: list that alternates btwn state, action, state ...
+        """
         pass
 
 class WFSSolver(Solver):
@@ -28,17 +41,20 @@ class WFSSolver(Solver):
         frontier = self.data_structure()
         frontier.add(sokoban)
         visited = set([sokoban])
+        prev = { sokoban : None }
+        
         while len(frontier) > 0 and len(visited) < max_nodes:
             sokoban = frontier.get()
 
             if sokoban.solved():
                 quiet or print("visited: " + str(len(visited)))
-                return sokoban
+                return trace_history(prev, sokoban)
 
-            for sokoban_ in sokoban.neighbors:
+            for sokoban_, action in sokoban.neighbors:
                 if sokoban_ not in visited:
                     frontier.add(sokoban_)
                     visited.add(sokoban_)
+                    prev[sokoban_] = (sokoban, action)
 
         return None
 
@@ -139,19 +155,21 @@ class GreedyBestFSSolver(Solver):
 
         frontier = [sokoban]
         visited = set(frontier)
+        prev = { sokoban : None }
 
         while len(frontier) > 0 and len(visited) < max_nodes:
             sokoban = frontier.pop()
 
             if sokoban.solved():
                 quiet or print("visited: " + str(len(visited)))
-                return sokoban
+                return trace_history(prev, sokoban)
 
             neighbors = []
-            for sokoban_ in sokoban.neighbors:
+            for sokoban_, action in sokoban.neighbors:
                 if sokoban_ not in visited:
                     neighbors.append(sokoban_)
                     visited.add(sokoban_)
+                    prev[sokoban_] = (sokoban, action)
 
             neighbors = list(sorted(neighbors, key = self.heuristic.evaluate,
                                     reverse = True))
@@ -163,21 +181,27 @@ class AStarSolver(Solver):
     def __init__(self, heuristic = NoHeuristic()):
         self.heuristic = heuristic
 
-    def solve(self, sokoban, max_nodes = 10 ** 6, quiet = True):
+    def solve(self, sokoban, max_nodes = 10 ** 6, state = None, quiet = True):
         sokoban = sokoban.copy()
         sokoban.player = sokoban.get_normalized_player_position()
+        if state is not None:
+            seed(state)
         
         # total distance from start to goal for each node found so far
-        tot_dist_map = { sokoban : self.heuristic.evaluate(sokoban) }
+        self.tot_dist_map = tot_dist_map = \
+                            { sokoban : self.heuristic.evaluate(sokoban) }
 
         # least distance from start node to each node found so far
-        cur_dist_map = { sokoban : 0 }
+        self.cur_dist_map = cur_dist_map = { sokoban : 0 }
         
         # heap containing (current dist + estimated dist to goal, sokoban) pairs
-        frontier = [(tot_dist_map[sokoban], sokoban)]
+        self.frontier = frontier = [(tot_dist_map[sokoban], sokoban)]
 
         # set of visited sokoban problem instances
-        visited = set([sokoban])
+        self.visited = visited = set([sokoban])
+
+        # mapping from puzzle instance to state + action that produced it
+        self.prev = prev = { sokoban : None }
         
         while len(frontier) > 0 and len(visited) < max_nodes:
             # skip if node is outdated
@@ -188,11 +212,13 @@ class AStarSolver(Solver):
             # check if goal has been reached
             if sokoban.solved():
                 quiet or print("visited: " + str(len(visited)))
-                return sokoban
+                return trace_history(prev, sokoban)
             visited.add(sokoban)
 
+            neighbors = list(sokoban.neighbors)
+            shuffle(neighbors)
             cur_dist = cur_dist_map[sokoban]
-            for sokoban_ in sokoban.neighbors:
+            for sokoban_, action in neighbors:
                 if sokoban_ in visited:
                     continue
 
@@ -205,5 +231,6 @@ class AStarSolver(Solver):
                 tot_dist_map[sokoban_] = dist + \
                                          self.heuristic.evaluate(sokoban_)
                 heapq.heappush(frontier, (tot_dist_map[sokoban_], sokoban_))
+                prev[sokoban_] = (sokoban, action)
 
         return None

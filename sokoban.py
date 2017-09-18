@@ -70,6 +70,10 @@ class BoxPushAction(Action):
             # move player to new normalized position
             game.player = game.get_normalized_player_position()
 
+    def __str__(self):
+        return "box = " + str(self.box_position) + \
+               ", dir = " + str(self.direction)
+
 class Position:
     def __init__(self, row, col):
         self.row = int(row)
@@ -121,6 +125,9 @@ class Position:
 
     def __hash__(self):
         return 173 * self.row + 311 * self.col
+
+    def __str__(self):
+        return "(" + str(self.row) + ", " + str(self.col) + ")"
 
 class Board(np.ndarray):
     # 2d array of walls + boxes. player + goals represented in separate var
@@ -228,7 +235,7 @@ class Sokoban:
         for action in self.get_push_actions():
             sokoban_ = self.copy()
             action.act(sokoban_)
-            yield sokoban_
+            yield sokoban_, action
 
     def get_player_reachable_positions(self):
         # perform flood fill to get spaces reachable from player position

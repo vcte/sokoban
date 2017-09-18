@@ -28,7 +28,7 @@ def build_area_containment_mapping(max_area = (4, 5)):
                         contained_by[area].append(sup_area_)
     return contained_by
 
-def generate_board_configs(area):
+def generate_board_configs(area, objs = [SPACE, WALL]):
     # TODO: enumerate boards w/ 0 walls, then 1 walls, ...
     def generate_board_configs_(row, col):
         if row < 0 or col < 0:
@@ -41,11 +41,12 @@ def generate_board_configs(area):
         else:
             col_ = col - 1
             row_ = row
+        
         for board_array in generate_board_configs_(row_, col_):
-            yield board_array
-            board_array_ = board_array.copy()
-            board_array_[row, col] = WALL
-            yield board_array_
+            for obj in objs:
+                board_array_ = board_array.copy()
+                board_array_[row, col] = obj
+                yield board_array_
 
     for board_array in generate_board_configs_(area[0] - 1, area[1] - 1):
         yield Board.from_array(board_array)
