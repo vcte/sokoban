@@ -33,15 +33,16 @@ class Solver(ABC):
 
 class WFSSolver(Solver):
     # whatever-first search (i.e., uninformed search)
-    def solve(self, sokoban, max_nodes = 10 ** 6, quiet = True):
+    def solve(self, sokoban, max_nodes = 10 ** 6, state = None, quiet = True):
         # first move player to normalized position
         sokoban = sokoban.copy()
         sokoban.player = sokoban.get_normalized_player_position()
+        if state is not None:
+            seed(state)
         
-        frontier = self.data_structure()
-        frontier.add(sokoban)
-        visited = set([sokoban])
-        prev = { sokoban : None }
+        self.frontier = frontier = self.data_structure([sokoban])
+        self.visited = visited = set([sokoban])
+        self.prev = prev = { sokoban : None }
         
         while len(frontier) > 0 and len(visited) < max_nodes:
             sokoban = frontier.get()
@@ -50,7 +51,9 @@ class WFSSolver(Solver):
                 quiet or print("visited: " + str(len(visited)))
                 return trace_history(prev, sokoban)
 
-            for sokoban_, action in sokoban.neighbors:
+            neighbors = list(sokoban.neighbors)
+            shuffle(neighbors)
+            for sokoban_, action in neighbors:
                 if sokoban_ not in visited:
                     frontier.add(sokoban_)
                     visited.add(sokoban_)
@@ -74,13 +77,13 @@ class Stack(list):
 
 class BFSSolver(WFSSolver):
     # breadth-first search
-    def data_structure(self):
-        return Queue()
+    def data_structure(self, init = []):
+        return Queue(init)
 
 class DFSSolver(WFSSolver):
     # depth-first search
-    def data_structure(self):
-        return Stack()
+    def data_structure(self, init = []):
+        return Stack(init)
 
 class Heuristic(ABC):
     def __init__(self):
@@ -139,9 +142,15 @@ class DeadlockHeuristic(Heuristic):
         
     def _evaluate(self, sokoban):
         # heuristic value is inf if deadlock detected, else defaults to 0
+        # boxes that are on top of goal do not count towards deadlock
+        board = sokoban.board.copy()
+        for goal in sokoban.goals:
+            board[goal] = SPACE
+
+        # lookup all subboards in deadlock table, for each subboard size
         for area in self.deadlock_table:
-            if subboard_in_lookup_table(self.deadlock_table[area],
-                                        sokoban.board, area):
+            if subboard_in_deadlock_table(self.deadlock_table[area],
+                                          sokoban, area):
                 return inf
         return 0
 
@@ -153,9 +162,9 @@ class GreedyBestFSSolver(Solver):
         sokoban = sokoban.copy()
         sokoban.player = sokoban.get_normalized_player_position()
 
-        frontier = [sokoban]
-        visited = set(frontier)
-        prev = { sokoban : None }
+        self.frontier = frontier = [sokoban]
+        self.visited = visited = set(frontier)
+        self.prev = prev = { sokoban : None }
 
         while len(frontier) > 0 and len(visited) < max_nodes:
             sokoban = frontier.pop()

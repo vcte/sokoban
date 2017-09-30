@@ -179,8 +179,23 @@ class Board(np.ndarray):
         board[:] = array
         return board
 
+    @staticmethod
+    def from_encoding(code, shape):
+        decoding = { 0 : SPACE, 1 : WALL, 2 : BOX }
+        board = Board(shape)
+        for r in range(shape[0]):
+            for c in range(shape[1]):
+                board[r, c] = decoding[code % 3]
+                code = code // 3
+        return board
+
     def in_bounds(self, position):
         return 0 <= position[0] < self.rows and 0 <= position[1] < self.cols
+
+    def encode(self):
+        encoding = { SPACE : 0, WALL : 1, BOX : 2 }
+        return sum([encoding[self[r, c]] * (3 ** i)
+                    for i, (r, c) in enumerate(self.positions)])
 
     def __getitem__(self, pos):
         """pos = either Position or (row, col) tuple"""
@@ -280,9 +295,11 @@ class Sokoban:
         return False
 
     def __eq__(self, sokoban):
-        return self.board == sokoban.board and self.player == sokoban.player \
-               and len(self.goals) == len(sokoban.goals) \
-               and all([g1 == g2 for g1, g2 in zip(self.goals, sokoban.goals)])
+        return type(sokoban) is Sokoban and \
+               self.board == sokoban.board and \
+               self.player == sokoban.player and \
+               len(self.goals) == len(sokoban.goals) and \
+               all([g1 == g2 for g1, g2 in zip(self.goals, sokoban.goals)])
 
     def __hash__(self):
         return hash(self.board) + hash(self.player) + sum(map(hash, self.goals))

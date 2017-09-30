@@ -146,3 +146,11 @@ class I2AGenerator(Generator):
 
                 return Sokoban(board, player, goals)
 
+def generate_and_store_i2a(i_min, i_max):
+    gen = I2AGenerator()
+    for i in range(i_min, i_max + 1):
+        sokoban = gen.generate()
+        with open("puzzles/i2a_generated/gen_%d.txt" % i,
+                  mode = "w", encoding = "utf-8") as f:
+            out = f.write(str(sokoban))
+            

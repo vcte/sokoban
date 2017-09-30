@@ -58,26 +58,37 @@ def print_timings(parent = None, indent = ""):
             print(indent + name + ": " + str(total))
             print_timings(name, indent + " ")
 
+def subboard_matches_(pattern_, board):
+    # check if pattern matches part of the board
+    # TODO: optimize by using convolution? 
+    for dx in range(board.cols - pattern_.cols + 1):
+        for dy in range(board.rows - pattern_.rows + 1):
+            subboard = board[dy : dy + pattern_.rows,
+                             dx : dx + pattern_.cols]
+            if (subboard | pattern_) == subboard:
+                return True
+
 def subboard_matches(patterns, board):
     # check if any pattern in list matches part of board
     # iterate over all rotational / reflected variants of patterns
     for pattern in patterns:
         for pattern_ in pattern.isometric_boards:
-            # TODO: optimize by using convolution? 
-            for dx in range(board.cols - pattern_.cols + 1):
-                for dy in range(board.rows - pattern_.rows + 1):
-                    subboard = board[dy : dy + pattern_.rows,
-                                     dx : dx + pattern_.cols]
-                    if (subboard | pattern_) == subboard:
-                        return True
+            if subboard_matches_(pattern_, board):
+                return True
     return False
 
-def subboard_in_lookup_table(patterns, board, area):
+def subboard_in_deadlock_table(patterns, sokoban, area):
     # check if any pattern in list matches part of board
     # iterate over subboards of size (area) and lookup pattern in table
-    for dx in range(board.cols - area[1] + 1):
-        for dy in range(board.rows - area[0] + 1):
-            subboard = board[dy : dy + area[0], dx : dx + area[1]]
+    for dx in range(sokoban.board.cols - area[1] + 1):
+        for dy in range(sokoban.board.rows - area[0] + 1):
+            # skip if a goal is contained within the subboard
+            bounds = (dy, dy + area[0], dx, dx + area[1])
+            if any([goal.in_bounds(*bounds) for goal in sokoban.goals]):
+                continue
+
+            # look up the subboard in the deadlock table
+            subboard = sokoban.board[dy : dy + area[0], dx : dx + area[1]]
             if subboard in patterns:
                 return True
     return False
