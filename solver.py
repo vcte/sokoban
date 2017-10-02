@@ -95,8 +95,9 @@ class Heuristic(ABC):
 
     def evaluate(self, sokoban):
         value = self._evaluate(sokoban)
-        for heuristic in self._max_with:
-            value = max(value, heuristic.evaluate(sokoban))
+        if value != inf:
+            for heuristic in self._max_with:
+                value = max(value, heuristic.evaluate(sokoban))
         return value
 
     def max(self, heuristic):
@@ -135,23 +136,26 @@ class MinMatchingHeuristic(Heuristic):
         row_ind, col_ind = optimize.linear_sum_assignment(cost_matrix)
         return cost_matrix[row_ind, col_ind].sum()
 
-class DeadlockHeuristic(Heuristic):
+class DynamicDeadlockHeuristic(Heuristic):
     def __init__(self, deadlock_table = {}):
-        super(DeadlockHeuristic, self).__init__()
+        super(DynamicDeadlockHeuristic, self).__init__()
         self.deadlock_table = deadlock_table
         
     def _evaluate(self, sokoban):
         # heuristic value is inf if deadlock detected, else defaults to 0
-        # boxes that are on top of goal do not count towards deadlock
-        board = sokoban.board.copy()
-        for goal in sokoban.goals:
-            board[goal] = SPACE
+        if deadlock_detected(self.deadlock_table, sokoban, "dynamic"):
+            return inf
+        return 0
 
-        # lookup all subboards in deadlock table, for each subboard size
-        for area in self.deadlock_table:
-            if subboard_in_deadlock_table(self.deadlock_table[area],
-                                          sokoban, area):
-                return inf
+class StaticDeadlockHeuristic(Heuristic):
+    def __init__(self, deadlock_table = {}):
+        super(StaticDeadlockHeuristic, self).__init__()
+        self.deadlock_table = deadlock_table
+        
+    def _evaluate(self, sokoban):
+        # heuristic value is inf if deadlock detected, else defaults to 0
+        if deadlock_detected(self.deadlock_table, sokoban, "static"):
+            return inf
         return 0
 
 class GreedyBestFSSolver(Solver):

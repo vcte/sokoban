@@ -4,7 +4,6 @@ import os
 import array
 from math import *
 from random import choice
-from itertools import product
 
 from constants import *
 from deadlock import *
@@ -30,31 +29,11 @@ def gen_deadlock_table_from_basis(max_area = (4, 5),
         print("Warning: appending to a table file with existing content")
     
     deadlock_basis = parse_deadlock_table(deadlock_basis_file)
-    deadlock_patterns = {}
-    for board in deadlock_basis:
-        area = board.shape
-        for board_ in board.isometric_boards:
-            spaces = list(board_.spaces)
-            for config in product(*([(SPACE, WALL, BOX)] * len(spaces))):
-                board__ = board_.copy()
-                for space, obj in zip(spaces, config):
-                    board__[space] = obj
-                mapping = deadlock_patterns.get(area, set())
-                mapping.add(board__)
-                deadlock_patterns[area] = mapping
+    deadlock_patterns = gen_deadlock_table_from_basis_same_size(deadlock_basis)
 
     print(str(len(deadlock_patterns)) + " areas in dict")
     for area in deadlock_patterns:
         print(str(len(deadlock_patterns[area])) + " elements in " + str(area))
-
-    def deadlock_detected(board):
-        for area in deadlock_patterns:
-            for dx in range(board.cols - area[1] + 1):
-                for dy in range(board.rows - area[0] + 1):
-                    subboard = board[dy : dy + area[0], dx : dx + area[1]]
-                    if subboard in deadlock_patterns[area]:
-                        return True
-        return False
     
     total_configs = 3 ** (max_area[0] * max_area[1])
     with open(deadlock_table_file, mode = "ab") as f:
@@ -66,14 +45,14 @@ def gen_deadlock_table_from_basis(max_area = (4, 5),
                 continue
 
             if deadlock_detected(board):
-                # formats other than (4, 5) are not supported currently
+                # formats larger than (4, 5) are not supported currently
                 f.write(array.array('L', [board.encode()]))
             
 def gen_deadlock_data(deadlock_table_file = deadlock_table_file,
                       deadlock_data_dir = deadlock_data_dir):
     deadlock_table = parse_deadlock_table(deadlock_table_file)
     area = next(iter(deadlock_table)).shape
-    deadlock_heuristic = DeadlockHeuristic({ area : deadlock_table })
+    deadlock_heuristic = DynamicDeadlockHeuristic({ area : deadlock_table })
     heuristic = ManhattanDistHeuristic().max(deadlock_heuristic)
     astar = AStarSolver(heuristic = heuristic)
     bfs = BFSSolver()
